@@ -1,75 +1,74 @@
 package websocket
 
 import (
-	"bytes"
 	"github.com/gorilla/websocket"
+	"sync"
 	"time"
 )
 
 const (
 	// Timeout when the client has no any response
-	pongWait = 60 * time.Second
+	pongWait = 5 * time.Second
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 256
 )
 
 // Client is a middleman between the websocket connection and the hub.
-type Client struct {
-	// Point to the Hub
-	Hub 			*HubStruct
+type client struct {
+	// The Client toggle
+	enable			bool
 
 	// The websocket connection.
 	conn 			*websocket.Conn
 
+	// connection time
+	ConnectionTime	time.Time
+
 	// The message sender of the client
 	sender 			struct {
-		isOpen bool
-		reference int
-		channel chan[]byte
+		enable bool
+		mutex *sync.Mutex
 	}
 }
 
-func (c *Client) Send(message []byte) {
-	c.sender.reference++
+func (c *client) Send(message []byte) {
+	if !c.enable { return }
 
-	if c.sender.isOpen {
-		c.sender.channel <- message
+	c.sender.mutex.Lock()
+	defer c.sender.mutex.Unlock()
+
+	if !c.enable { return }
+	if !c.sender.enable { return }
+	c.conn.WriteMessage(websocket.TextMessage,message)
+}
+
+func (c *client) Close() {
+	c.enable = false
+
+	c.sender.mutex.Lock()
+	defer c.sender.mutex.Unlock()
+
+	if c.sender.enable {
+		c.sender.enable = false
+	}else{
+		return
 	}
 
-	c.sender.reference--
+	// 关闭通道
+	// 会触发，receiver 产生错误而退出
+	c.conn.Close()
 }
 
+func (c *client) receiver(channel chan *Pack) {
+	defer c.Close()
 
-func (c *Client) wPump() {
-	defer func(c *Client) {
-		c.sender.isOpen = true
-	}(c)
-
-	c.sender = struct {
-		isOpen bool
-		reference int
-		channel chan[]byte
-	}{isOpen:false,reference:0,channel:make(chan []byte,maxClients)}
-
-	go func(c *Client) {
-		for {
-			select {
-			case message,ok := <- c.sender.channel:
-				if ok {
-					c.conn.WriteMessage(websocket.TextMessage,message)
-				}else{
-					return
-				}
-			}
-		}
-	}(c)
-}
-
-func (c *Client) rPump(onMessage OnMessage) {
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.conn.SetPingHandler(func(appData string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
 
 	for {
 		_,message,err := c.conn.ReadMessage()
@@ -81,34 +80,12 @@ func (c *Client) rPump(onMessage OnMessage) {
 			//}
 			return
 		}
+
+		// 重置dead line时间
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		if bytes.Equal(message,[]byte("ping")) != true {
-			if onMessage != nil { onMessage(c,message) }
-		}
+
+		// 消息存放到channel
+		// 等待消息消费进程处理
+		channel <- &Pack{Client:c,Message:message}
 	}
-}
-
-func (c *Client) close() {
-	// 如果已经关闭，直接退出
-	if c.sender.isOpen == false { return }
-
-	// 关闭发送器
-	c.sender.isOpen = false
-
-	// 关闭通道
-	// 会触发，rPump产生错误而退出
-	c.conn.Close()
-
-	// 等待发送中的消息完成
-	// 主要防止channel关闭，导致其他goroutine向channel发送消息时，发生异常
-	go func(c *Client) {
-		for {
-			if c.sender.reference == 0 {
-				// 关闭发送通道
-				close(c.sender.channel)
-				return
-			}
-			time.Sleep(5*time.Millisecond)
-		}
-	}(c)
 }

@@ -1,0 +1,298 @@
+<html>
+<head>
+    <title>Title</title>
+ 
+    <style>
+        
+    </style>
+    <script type="text/javascript" src="jquery.js"></script>
+</head>
+<body>
+
+<script>
+    var websocket = null;
+    //判断当前浏览器是否支持WebSocket
+    // if ('WebSocket' in window) {
+    //     websocket = new WebSocket("ws://192.168.56.101:9501?token=AAAAAAAMfFBmWAcHCAEBBgIKCQUEAAIKAQg&session_id=7q4r46k8vpq2gq3a4cv5ga4srs");
+    // }
+    // else {
+    //     alert('当前浏览器 Not support websocket')
+    // }
+    
+    //连接发生错误的回调方法
+    // websocket.onerror = function () {
+    //     setMessageInnerHTML("WebSocket连接发生错误");
+    // };
+ 
+    // //连接成功建立的回调方法
+    // websocket.onopen = function () {
+    //     setMessageInnerHTML("WebSocket连接成功");
+    //     setInterval(function(){
+    //         websocket.send("ping");
+    //     },10*1000);
+    // }
+ 
+    // //接收到消息的回调方法
+    // websocket.onmessage = function (event) {
+    //     printMessage(JSON.parse(event.data));
+    // }
+ 
+    // //连接关闭的回调方法
+    // websocket.onclose = function () {
+    //     setMessageInnerHTML("WebSocket连接关闭");
+    // }
+ 
+    // //监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。
+    // window.onbeforeunload = function () {
+    //     closeWebSocket();
+    // }
+ 
+    function printMessage(data)
+    {
+        // var msg = "";
+        // msg += "obj:" + data['obj'] + " cmd:" + data['cmd'] + " message:" + data['message'] + " data:" + JSON.stringify(data['data']);;
+        // document.getElementById('message').innerHTML = msg + '<br/>' + document.getElementById('message').innerHTML;
+        document.getElementById('message').innerHTML = data + '<br/>' + document.getElementById('message').innerHTML;
+    }
+
+    //将消息显示在网页上
+    function setMessageInnerHTML(innerHTML) {
+        document.getElementById('message').innerHTML += innerHTML + '<br/>';
+    }
+ 
+    //关闭WebSocket连接
+    function closeWebSocket() {
+        websocket.close();
+    }
+ 
+    //发送消息
+    function send() {
+        console.log("asfdasdfsdf");
+        var message = document.getElementById('text').value;
+        websocket.send(message);
+    }
+</script>
+
+<input id="websocketUrl" style="width:500px;" type="text" value="ws://127.0.0.1:8081"/>
+<button id="websocketConnect">连接</button>
+<hr/>
+<input id="mineNumbers" type="text"/><span>雷点</span>
+<input id="totalAmountOfRedPackage" type="text" value="10"/><span>金额</span>
+<input id="totalNumberOfRedPackage" type="text" value="7"/><span>份数</span>
+<button id="make">发红包</button>
+
+<hr/>
+<input id="redPackageId" />
+<button id="rob">抢红包</button>
+<button id="check">查询红包</button>
+<hr/>
+<button id="clean">清屏</button>
+<button id="record">频道记录</button>
+<button id="sync">同步状态</button>
+<button id="balance">余额</button>
+<button id="info">用户信息</button>
+
+<hr/>
+<button id="login">登陆A</button>
+<button id="loginB">登陆B</button>
+<div id="message"></div>
+<input id="messageForChat"/>
+<button id="sendMessageForChat">发送聊天消息</button>
+<hr/>
+
+<script>
+    $(document).ready(function(){
+        $("#websocketConnect").click(function(){
+            var websocketUrl = $("#websocketUrl").val();
+             if ('WebSocket' in window) {
+                websocket = new WebSocket(websocketUrl);
+            }
+            else {
+                alert('当前浏览器 Not support websocket')
+            }
+
+            //连接发生错误的回调方法
+            websocket.onerror = function () {
+                setMessageInnerHTML("WebSocket连接发生错误");
+            };
+            
+            //连接成功建立的回调方法
+            websocket.onopen = function () {
+                setMessageInnerHTML("WebSocket连接成功");
+                setInterval(function(){
+                    websocket.send("ping");
+                },10*1000);
+            }
+            
+            //接收到消息的回调方法
+            websocket.onmessage = function (event) {
+                // printMessage(JSON.parse(event.data));
+                printMessage(event.data);
+            }
+            
+            //连接关闭的回调方法
+            websocket.onclose = function () {
+                setMessageInnerHTML("WebSocket连接关闭");
+            }
+        
+            //监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。
+            window.onbeforeunload = function () {
+                closeWebSocket();
+            }
+        });
+
+        $("#make").click(function(){
+            var mineNumbers = $("#mineNumbers").val();
+            var totalAmountOfRedPackage = Number($("#totalAmountOfRedPackage").val());
+            var totalNumberOfRedPackage = Number($("#totalNumberOfRedPackage").val());
+            var data = {
+                obj:"redPackage",
+                cmd:"make",
+                mineNumbers:mineNumbers,
+                totalAmountOfRedPackage:totalAmountOfRedPackage,
+                totalNumberOfRedPackage:totalNumberOfRedPackage
+            };
+            var data = {
+                Cmd:"RedPackage/Make",
+                RedPackageMake:{
+                    MineNumbers:mineNumbers,
+                    TotalAmount:totalAmountOfRedPackage,
+                    TotalNumber:totalNumberOfRedPackage
+                }
+            }
+            websocket.send(JSON.stringify(data));
+        });
+        
+        $('#rob').click(function(){
+            var redPackageId;
+            redPackageId = $('#redPackageId').val();
+            var data = {
+                obj:"redPackage",
+                cmd:"rob",
+                redPackageId:redPackageId
+            };
+            var data = {
+                Cmd:"RedPackage/Rob",
+                RedPackageRob:{
+                    RedPackageId: Number(redPackageId)
+                }
+            }
+            websocket.send(JSON.stringify(data));
+        });
+
+        $("#check").click(function(){
+            var redPackageId;
+            redPackageId = $("#redPackageId").val();
+            var data = {
+                obj:"redPackage",
+                cmd:"check",
+                redPackageId:redPackageId
+            };
+            var data = {
+                Cmd : "RedPackage/Check",
+                RedPackageCheck:{
+                    RedPackageId: Number(redPackageId)
+                }
+            }
+            websocket.send(JSON.stringify(data));
+        });
+        
+        $("#clean").click(function(){
+            document.getElementById('message').innerHTML = "";
+        });
+
+        $("#record").click(function(){
+            var data = {
+                obj:"channel",
+                cmd:"record"
+            };
+            var data = {
+                Cmd:"RedPackage/LastRecord"
+            }
+            websocket.send(JSON.stringify(data));
+        });
+
+        $("#sync").click(function(){
+            var data = {
+                Cmd:"RedPackage/Status",
+                RedPackageStatus : {
+                    IdList:[103509666037760,103509574418432,103509573238784]
+                }
+            };
+            websocket.send(JSON.stringify(data));
+        });
+
+        $("#balance").click(function(){
+            var data = {
+                obj:"account",
+                cmd:"balance"
+            };
+            var data = {
+                Cmd: "Account/Balance"
+            }
+            websocket.send(JSON.stringify(data));
+        });
+        
+        $("#info").click(function(){
+            var data = {
+                Cmd: "Account/Info"
+            }
+            websocket.send(JSON.stringify(data));
+        });
+
+        $("#login").click(function() {
+            var data = {
+                Cmd : "Session/Login",
+                // Session : {
+                //     Login : {
+                //         UserId : 100289,
+                //         Token : "AAAAAAAMfFBmWAcDAggIAgMKCQMDAQAKAQAAAggJ",
+                //         SessionId : "ifg6k4vnom0ojcmajm0ghat36e"
+                //     },
+                // },
+                SessionLogin : {
+                    UserId : 100289,
+                        Token : "AAAAAAAMfFBmWAcDAggIAgMKCQMDAQAKAQAAAggJ",
+                        SessionId : "ifg6k4vnom0ojcmajm0ghat36e"
+                }
+            }
+            websocket.send(JSON.stringify(data));
+        });
+
+        $("#loginB").click(function() {
+            var data = {
+                Cmd : "Session/Login",
+                SessionLogin : {
+                    UserId : 100287,
+                        Token : "AAAAAAAMfFBmWAcACAUBAgQKAwIDAQUKAQAAAggH",
+                        SessionId : "lcfea3kenmb1stvodgr7o37k1u"
+                }
+            }
+            websocket.send(JSON.stringify(data));
+        });
+
+        $("#sendMessageForChat").click(function () {
+            var message;
+            message = $("#messageForChat").val();
+            var data = {
+                Cmd : "",
+                Message : message
+            }
+            websocket.send(JSON.stringify(data))
+        });
+    });
+</script>
+
+<scrit>
+    var router[];
+
+
+    routerAdd(path,callback){
+
+    }
+</scrit>
+
+</body>
+
+
+</html>
